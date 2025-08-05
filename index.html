@@ -1,0 +1,239 @@
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>RAYCOIN Wallet</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<style>
+  body { font-family: sans-serif; margin: 0; background: #f0f0f0; }
+  nav { background: #222; color: #fff; padding: 10px; display: flex; gap: 10px; }
+  nav button { background: #444; color: #fff; border: none; padding: 10px; cursor: pointer; }
+  section { display: none; padding: 20px; }
+  section.active { display: block; }
+  input, button, textarea, select { width: 100%; margin: 5px 0; padding: 8px; }
+  #trustCanvas { width: 100%; height: 250px; border: 1px solid #ccc; }
+  pre { background: #eee; padding: 10px; overflow-x: auto; }
+  iframe { background: #fff; padding: 0; margin: 0; border: 1px solid #ccc; }
+  #captchaText { font-family: monospace; background: #ddd; padding: 10px; }
+</style>
+</head>
+<body>
+
+<section id="signin" class="active">
+<h2>Sign In to RAYCOIN Wallet</h2>
+<select id="language">
+  <option value="en">English (United States)</option>
+  <option value="es">Español (España)</option>
+  <option value="fr">Français (France)</option>
+</select>
+<input id="username" placeholder="Username">
+<input id="password" type="password" placeholder="Password">
+<div id="captchaText">Type the text: X7kP2</div>
+<input id="captchaInput" placeholder="Enter CAPTCHA text">
+<button onclick="signIn()">Sign In</button>
+<p>Not your computer? <a href="#" onclick="openPrivateBrowsing()">Use Private Browsing</a></p>
+</section>
+
+<nav style="display: none;" id="mainNav">
+<button onclick="switchTab('wallet')">🪙 Wallet</button>
+<button onclick="switchTab('trust')">🤝 Trust</button>
+<button onclick="switchTab('governance')">🏛️ Governance</button>
+<button onclick="switchTab('share')">📤 Share</button>
+<button onclick="switchTab('events')">📅 Events</button>
+</nav>
+
+<section id="wallet">
+<h2>Generate Wallet</h2>
+<button onclick="generateWallet()">🔐 Create Wallet</button>
+<div id="walletInfo"></div>
+<h3>Mine Block</h3>
+<button onclick="mineBlock()">⛏️ Mine</button>
+<div id="balance">Balance: 0</div>
+<div id="blockchain"></div>
+</section>
+
+<section id="trust">
+<h2>Trust Graph</h2>
+<canvas id="trustCanvas"></canvas>
+<input id="trustTarget" placeholder="Target Wallet">
+<input id="trustScore" type="number" min="0" max="100" placeholder="Score">
+<button onclick="addTrust()">➕ Add Trust</button>
+</section>
+
+<section id="governance">
+<h2>Voting Panel</h2>
+<button onclick="toggleGovernance()">Enable Governance</button>
+<div id="voteBox" class="hidden">
+  <p>Proposal: Increase mining rewards</p>
+  <button onclick="vote('yes')">👍 Yes</button>
+  <button onclick="vote('no')">👎 No</button>
+  <div id="voteResult"></div>
+</div>
+</section>
+
+<section id="share">
+<h2>Invite & Export</h2>
+<button onclick="generateInvite()">🔗 Generate Invite</button>
+<textarea id="inviteCode" readonly></textarea>
+<input id="inviteInput" placeholder="Paste Invite Code">
+<button onclick="importInvite()">📥 Import</button>
+<h3>Export Wallet</h3>
+<button onclick="exportWallet()">📦 Export</button>
+<pre id="exportData"></pre>
+</section>
+
+<section id="events">
+<h2>📅 Coin 3 Events</h2>
+<p>Live governance + trust activity from the public ledger sheet.</p>
+<iframe src="https://docs.google.com/spreadsheets/d/146kh36wIwcMwYJWWaDx2Lezg28N6PvjQPoZ0uoRKo6M/edit?gid=1386834576" width="100%" height="600"></iframe>
+</section>
+
+<script>
+let wallet = null;
+let blockchain = [];
+let trustMap = {};
+let governanceEnabled = false;
+let currentUser = null;
+
+// Persistent Storage Functions
+function saveState() {
+  if (!currentUser) return;
+  const data = {
+    wallet,
+    blockchain,
+    trustMap,
+    governanceEnabled,
+    lastSaved: Date.now()
+  };
+  localStorage.setItem(`raycoin_${currentUser}`, JSON.stringify(data));
+}
+
+function loadState(username) {
+  const data = localStorage.getItem(`raycoin_${username}`);
+  if (!data) throw new Error('No wallet found for this user');
+
+  const parsed = JSON.parse(data);
+  wallet = parsed.wallet || null;
+  blockchain = parsed.blockchain || [];
+  trustMap = parsed.trustMap || {};
+  governanceEnabled = parsed.governanceEnabled || false;
+
+  updateUI();
+  return parsed;
+}
+
+// Existing Application Functions
+async function signIn() {
+  const username = document.getElementById('username').value;
+  const password = document.getElementById('password').value;
+  const captcha = document.getElementById('captchaInput').value;
+
+  if (captcha !== 'X7kP2') return alert('Invalid CAPTCHA');
+  if (!username || !password) return alert('Enter username and password');
+
+  try {
+    currentUser = username;
+    await loadState(username);
+    document.getElementById('signin').style.display = 'none';
+    document.getElementById('mainNav').style.display = 'flex';
+    switchTab('wallet');
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+function openPrivateBrowsing() {
+  alert('Open a private browsing window in your browser for guest mode.');
+}
+
+function switchTab(id) {
+  document.querySelectorAll('section').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function generateWallet() {
+  wallet = 'wallet_' + Math.random().toString(36).slice(2);
+  trustMap[wallet] = {};
+  blockchain = [];
+  document.getElementById('walletInfo').textContent = 'Wallet ID: ' + wallet;
+  updateUI();
+  saveState();
+}
+
+function mineBlock() {
+  if (!wallet) return alert('Generate a wallet first');
+  blockchain.push({ miner: wallet, time: Date.now() });
+  updateUI();
+  saveState();
+}
+
+function updateUI() {
+  document.getElementById('balance').textContent = 'Balance: ' + blockchain.filter(b => b.miner === wallet).length;
+  document.getElementById('blockchain').textContent = JSON.stringify(blockchain, null, 2);
+  renderTrustGraph();
+  if (governanceEnabled) document.getElementById('voteBox').classList.remove('hidden');
+}
+
+function addTrust() {
+  const t = document.getElementById('trustTarget').value;
+  const s = parseInt(document.getElementById('trustScore').value);
+  if (!t || isNaN(s)) return;
+  trustMap[wallet][t] = s;
+  renderTrustGraph();
+  saveState();
+}
+
+function renderTrustGraph() {
+  const c = document.getElementById('trustCanvas');
+  const ctx = c.getContext('2d');
+  ctx.clearRect(0, 0, c.width, c.height);
+  if (!wallet) return;
+  ctx.fillText('Trust for ' + wallet, 10, 20);
+  let y = 40;
+  for (let t in trustMap[wallet]) {
+    ctx.fillText(`${t}: ${trustMap[wallet][t]}`, 10, y);
+    y += 20;
+  }
+}
+
+function toggleGovernance() {
+  governanceEnabled = true;
+  document.getElementById('voteBox').classList.remove('hidden');
+  saveState();
+}
+
+function vote(choice) {
+  const weight = Object.values(trustMap[wallet] || {}).reduce((a, b) => a + b, 0);
+  document.getElementById('voteResult').textContent = `Voted ${choice.toUpperCase()} with weight ${weight}`;
+}
+
+function generateInvite() {
+  const data = btoa(JSON.stringify({ from: wallet, trust: trustMap[wallet], time: Date.now() }));
+  document.getElementById('inviteCode').value = data;
+}
+
+function importInvite() {
+  const raw = document.getElementById('inviteInput').value;
+  try {
+    const decoded = JSON.parse(atob(raw));
+    trustMap[wallet][decoded.from] = 50;
+    renderTrustGraph();
+    saveState();
+  } catch (e) {
+    alert('Invalid code');
+  }
+}
+
+function exportWallet() {
+  document.getElementById('exportData').textContent = JSON.stringify({ wallet, blockchain, trustMap, governanceEnabled }, null, 2);
+  saveState();
+}
+
+// Initialize
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+
+</body>
+</html>
