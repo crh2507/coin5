@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -20,7 +21,7 @@
 <body>
 
 <section id="signin" class="active">
-<h2>Sign In to RAYCOIN Wallet</h2>
+<h2>Access RAYCOIN Wallet</h2>
 <select id="language">
   <option value="en">English (United States)</option>
   <option value="es">Español (España)</option>
@@ -30,7 +31,7 @@
 <input id="password" type="password" placeholder="Password">
 <div id="captchaText">Type the text: X7kP2</div>
 <input id="captchaInput" placeholder="Enter CAPTCHA text">
-<button onclick="signIn()">Sign In</button>
+<button onclick="accessWallet()">Continue</button>
 <p>Not your computer? <a href="#" onclick="openPrivateBrowsing()">Use Private Browsing</a></p>
 </section>
 
@@ -95,7 +96,6 @@ let trustMap = {};
 let governanceEnabled = false;
 let currentUser = null;
 
-// Persistent Storage Functions
 function saveState() {
   if (!currentUser) return;
   const data = {
@@ -110,20 +110,17 @@ function saveState() {
 
 function loadState(username) {
   const data = localStorage.getItem(`raycoin_${username}`);
-  if (!data) throw new Error('No wallet found for this user');
-
+  if (!data) return null;
   const parsed = JSON.parse(data);
   wallet = parsed.wallet || null;
   blockchain = parsed.blockchain || [];
   trustMap = parsed.trustMap || {};
   governanceEnabled = parsed.governanceEnabled || false;
-
   updateUI();
   return parsed;
 }
 
-// Existing Application Functions
-async function signIn() {
+function accessWallet() {
   const username = document.getElementById('username').value;
   const password = document.getElementById('password').value;
   const captcha = document.getElementById('captchaInput').value;
@@ -131,15 +128,18 @@ async function signIn() {
   if (captcha !== 'X7kP2') return alert('Invalid CAPTCHA');
   if (!username || !password) return alert('Enter username and password');
 
-  try {
-    currentUser = username;
-    await loadState(username);
-    document.getElementById('signin').style.display = 'none';
-    document.getElementById('mainNav').style.display = 'flex';
-    switchTab('wallet');
-  } catch (e) {
-    alert(e.message);
+  currentUser = username;
+  const existing = loadState(username);
+
+  if (!existing) {
+    generateWallet();
+    alert('New wallet created for user: ' + username);
   }
+
+  document.getElementById('signin').style.display = 'none';
+  document.getElementById('mainNav').style.display = 'flex';
+  switchTab('wallet');
+  saveState();
 }
 
 function openPrivateBrowsing() {
@@ -225,15 +225,4 @@ function importInvite() {
 }
 
 function exportWallet() {
-  document.getElementById('exportData').textContent = JSON.stringify({ wallet, blockchain, trustMap, governanceEnabled }, null, 2);
-  saveState();
-}
-
-// Initialize
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js');
-}
-</script>
-
-</body>
-</html>
+  document.getElementBy
